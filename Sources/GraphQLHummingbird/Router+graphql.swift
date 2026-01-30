@@ -1,0 +1,79 @@
+import GraphQL
+import Hummingbird
+
+public extension Router {
+    /// Registers graphql routes that respond using the provided schema.
+    ///
+    /// The resulting routes adhere to the [GraphQL over HTTP spec](https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md).
+    /// The configured IDE is available by making a `GET` request to the path with no query parameter.
+    ///
+    /// If enabled, WebSocket requests to the path are accepted and support the
+    /// [`graphql-transport-ws`](https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md)
+    /// and [`graphql-ws`](https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md)
+    /// subprotocols.
+    ///
+    /// - Parameters:
+    ///   - path: The route that should respond to GraphQL requests. Both `GET` and `POST` routes are registered.
+    ///   - schema: The GraphQL schema that should be used to respond to requests.
+    ///   - rootValue: The `rootValue` GraphQL execution arg. This is the object passed to the root resolvers.
+    ///   - config: GraphQL Handler configuration options. See type documentation for details.
+    ///   - computeContext: A closure used to compute the GraphQL context from incoming requests. This must be provided.
+    @discardableResult
+    func graphql<
+        GraphQLContext: Sendable,
+        WebSocketInit: Equatable & Codable & Sendable
+    >(
+        _ path: RouterPath = "graphql",
+        schema: GraphQLSchema,
+        rootValue: any Sendable = (),
+        config: GraphQLConfig<WebSocketInit> = GraphQLConfig<EmptyWebsocketInit>(),
+        computeContext: @Sendable @escaping (Request, Context) async throws -> GraphQLContext
+    ) -> Self {
+        // https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md#request
+        let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit>(
+            schema: schema,
+            rootValue: rootValue,
+            config: config,
+            computeContext: computeContext
+        )
+
+        get(path) { request, context -> Response in
+            // WebSocket handling
+            if
+                config.subscriptionProtocols.contains(.websocket),
+                request.headers[.connection]?.lowercased() == "upgrade"
+            {
+//                return try await handler.handleWebSocket(request: request, context: context)
+            }
+
+            // Get requests without a `query` parameter are considered to be IDE requests
+            let hasQueryParam = request.uri.query?.contains("query") ?? false
+            if !hasQueryParam {
+                switch config.ide.type {
+                case .graphiql:
+                    let url = request.uri.path
+                    let subscriptionUrl = config.subscriptionProtocols.contains(.websocket) ? url.replacingOccurrences(of: "http://", with: "ws://").replacingOccurrences(of: "https://", with: "wss://") : nil
+                    return try await GraphiQLHandler.respond(
+                        url: url,
+                        subscriptionUrl: subscriptionUrl
+                    )
+                case .none:
+                    // Let this get caught by the graphQLRequest decoding
+                    break
+                }
+            }
+
+            // Normal GET request handling
+            guard config.allowGet else {
+                throw HTTPError(.methodNotAllowed, message: "GET requests are disallowed")
+            }
+            return try await handler.handleGet(request: request, context: context)
+        }
+
+        post(path) { request, context in
+            try await handler.handlePost(request: request, context: context)
+        }
+
+        return self
+    }
+}

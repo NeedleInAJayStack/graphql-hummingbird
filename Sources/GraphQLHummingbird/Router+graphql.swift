@@ -1,5 +1,6 @@
 import GraphQL
 import Hummingbird
+import HummingbirdWebSocket
 
 public extension Router {
     /// Registers graphql routes that respond using the provided schema.
@@ -39,12 +40,12 @@ public extension Router {
 
         get(path) { request, context -> Response in
             // WebSocket handling
-            if
-                config.subscriptionProtocols.contains(.websocket),
-                request.headers[.connection]?.lowercased() == "upgrade"
-            {
+//            if
+//                config.subscriptionProtocols.contains(.websocket),
+//                request.headers[.connection]?.lowercased() == "upgrade"
+//            {
 //                return try await handler.handleWebSocket(request: request, context: context)
-            }
+//            }
 
             // Get requests without a `query` parameter are considered to be IDE requests
             let hasQueryParam = request.uri.query?.contains("query") ?? false
@@ -74,6 +75,71 @@ public extension Router {
             try await handler.handlePost(request: request, context: context)
         }
 
+        return self
+    }
+}
+
+public extension Router where Context: WebSocketRequestContext {
+    @discardableResult
+    func graphqlSubscribe<
+        GraphQLContext: Sendable,
+        WebSocketInit: Equatable & Codable & Sendable
+    >(
+        _ path: RouterPath = "graphql",
+        schema: GraphQLSchema,
+        rootValue: any Sendable = (),
+        config: GraphQLConfig<WebSocketInit> = GraphQLConfig<EmptyWebsocketInit>(),
+        computeContext: @Sendable @escaping (Request, Context) async throws -> GraphQLContext
+    ) -> Self {
+        let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit>(
+            schema: schema,
+            rootValue: rootValue,
+            config: config,
+            computeContext: computeContext
+        )
+
+        ws(path, shouldUpgrade: { request, _ in
+            var subProtocol: WebSocketSubProtocol?
+            let requestedSubProtocols = request.headers[values: .secWebSocketProtocol]
+            if requestedSubProtocols.isEmpty {
+                // Default
+                subProtocol = .graphqlTransportWs
+            } else {
+                // Choose highest client preference that we understand
+                for requestedSubProtocol in requestedSubProtocols {
+                    if let selectedSubProtocol = WebSocketSubProtocol(rawValue: requestedSubProtocol) {
+                        subProtocol = selectedSubProtocol
+                        break
+                    }
+                }
+            }
+            guard let subProtocol = subProtocol else {
+                // If they provided options but none matched, fail
+                throw HTTPError(.badRequest, message: "Unable to negotiate subprotocol. \(WebSocketSubProtocol.allCases) are supported.")
+            }
+            return .upgrade([.secWebSocketProtocol: subProtocol.rawValue])
+        }) { inbound, outbound, context in
+            let graphQLContext = try await computeContext(context.request, context.requestContext)
+
+            // TODO: DRY
+            var subProtocol: WebSocketSubProtocol = .graphqlTransportWs
+            let requestedSubProtocols = context.request.headers[values: .secWebSocketProtocol]
+            // Choose highest client preference that we understand
+            for requestedSubProtocol in requestedSubProtocols {
+                if let selectedSubProtocol = WebSocketSubProtocol(rawValue: requestedSubProtocol) {
+                    subProtocol = selectedSubProtocol
+                    break
+                }
+            }
+
+            try await handler.handleWebSocket(
+                inbound: inbound,
+                outbound: outbound,
+                graphqlContext: graphQLContext,
+                subProtocol: subProtocol,
+                logger: context.logger
+            )
+        }
         return self
     }
 }

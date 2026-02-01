@@ -8,10 +8,7 @@ public extension Router {
     /// The resulting routes adhere to the [GraphQL over HTTP spec](https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md).
     /// The configured IDE is available by making a `GET` request to the path with no query parameter.
     ///
-    /// If enabled, WebSocket requests to the path are accepted and support the
-    /// [`graphql-transport-ws`](https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md)
-    /// and [`graphql-ws`](https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md)
-    /// subprotocols.
+    /// WebSockets are not supported by the resulting route at this time.
     ///
     /// - Parameters:
     ///   - path: The route that should respond to GraphQL requests. Both `GET` and `POST` routes are registered.
@@ -39,14 +36,6 @@ public extension Router {
         )
 
         get(path) { request, context -> Response in
-            // WebSocket handling
-//            if
-//                config.subscriptionProtocols.contains(.websocket),
-//                request.headers[.connection]?.lowercased() == "upgrade"
-//            {
-//                return try await handler.handleWebSocket(request: request, context: context)
-//            }
-
             // Get requests without a `query` parameter are considered to be IDE requests
             let hasQueryParam = request.uri.query?.contains("query") ?? false
             if !hasQueryParam {
@@ -80,6 +69,19 @@ public extension Router {
 }
 
 public extension Router where Context: WebSocketRequestContext {
+    /// Registers a graphql websocket route that responds using the provided schema.
+    ///
+    /// WebSocket requests support the
+    /// [`graphql-transport-ws`](https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md)
+    /// and [`graphql-ws`](https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md)
+    /// subprotocols.
+    ///
+    /// - Parameters:
+    ///   - path: The route that should respond to GraphQL requests. Both `GET` and `POST` routes are registered.
+    ///   - schema: The GraphQL schema that should be used to respond to requests.
+    ///   - rootValue: The `rootValue` GraphQL execution arg. This is the object passed to the root resolvers.
+    ///   - config: GraphQL Handler configuration options. See type documentation for details. Note that all non-WebSocket values are ignored.
+    ///   - computeContext: A closure used to compute the GraphQL context from incoming requests. This must be provided.
     @discardableResult
     func graphqlSubscribe<
         GraphQLContext: Sendable,
@@ -99,39 +101,10 @@ public extension Router where Context: WebSocketRequestContext {
         )
 
         ws(path, shouldUpgrade: { request, _ in
-            var subProtocol: WebSocketSubProtocol?
-            let requestedSubProtocols = request.headers[values: .secWebSocketProtocol]
-            if requestedSubProtocols.isEmpty {
-                // Default
-                subProtocol = .graphqlTransportWs
-            } else {
-                // Choose highest client preference that we understand
-                for requestedSubProtocol in requestedSubProtocols {
-                    if let selectedSubProtocol = WebSocketSubProtocol(rawValue: requestedSubProtocol) {
-                        subProtocol = selectedSubProtocol
-                        break
-                    }
-                }
-            }
-            guard let subProtocol = subProtocol else {
-                // If they provided options but none matched, fail
-                throw HTTPError(.badRequest, message: "Unable to negotiate subprotocol. \(WebSocketSubProtocol.allCases) are supported.")
-            }
-            return .upgrade([.secWebSocketProtocol: subProtocol.rawValue])
+            try handler.shouldUpgrade(request: request)
         }) { inbound, outbound, context in
             let graphQLContext = try await computeContext(context.request, context.requestContext)
-
-            // TODO: DRY
-            var subProtocol: WebSocketSubProtocol = .graphqlTransportWs
-            let requestedSubProtocols = context.request.headers[values: .secWebSocketProtocol]
-            // Choose highest client preference that we understand
-            for requestedSubProtocol in requestedSubProtocols {
-                if let selectedSubProtocol = WebSocketSubProtocol(rawValue: requestedSubProtocol) {
-                    subProtocol = selectedSubProtocol
-                    break
-                }
-            }
-
+            let subProtocol = try handler.negotiateSubProtocol(request: context.request)
             try await handler.handleWebSocket(
                 inbound: inbound,
                 outbound: outbound,

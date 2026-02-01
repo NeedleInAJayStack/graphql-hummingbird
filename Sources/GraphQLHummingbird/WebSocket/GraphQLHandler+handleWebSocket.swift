@@ -78,4 +78,31 @@ extension GraphQLHandler {
         }
         try await messenger.start()
     }
+
+    func shouldUpgrade(request: Request) throws -> RouterShouldUpgrade {
+        let subProtocol = try negotiateSubProtocol(request: request)
+        return .upgrade([.secWebSocketProtocol: subProtocol.rawValue])
+    }
+
+    func negotiateSubProtocol(request: Request) throws -> WebSocketSubProtocol {
+        var subProtocol: WebSocketSubProtocol?
+        let requestedSubProtocols = request.headers[values: .secWebSocketProtocol]
+        if requestedSubProtocols.isEmpty {
+            // Default
+            subProtocol = .graphqlTransportWs
+        } else {
+            // Choose highest client preference that we understand
+            for requestedSubProtocol in requestedSubProtocols {
+                if let selectedSubProtocol = WebSocketSubProtocol(rawValue: requestedSubProtocol) {
+                    subProtocol = selectedSubProtocol
+                    break
+                }
+            }
+        }
+        guard let subProtocol = subProtocol else {
+            // If they provided options but none matched, fail
+            throw HTTPError(.badRequest, message: "Unable to negotiate subprotocol. \(WebSocketSubProtocol.allCases) are supported.")
+        }
+        return subProtocol
+    }
 }

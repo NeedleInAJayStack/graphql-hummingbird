@@ -36,6 +36,7 @@ let package = Package(
             dependencies: [
                 "GraphQLHummingbird",
                 .product(name: "HummingbirdTesting", package: "hummingbird"),
+                .product(name: "HummingbirdWSTesting", package: "hummingbird-websocket"),
             ]
         ),
     ]

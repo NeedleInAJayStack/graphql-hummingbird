@@ -8,8 +8,6 @@ public extension Router {
     /// The resulting routes adhere to the [GraphQL over HTTP spec](https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md).
     /// The configured IDE is available by making a `GET` request to the path with no query parameter.
     ///
-    /// WebSockets are not supported by the resulting route at this time.
-    ///
     /// - Parameters:
     ///   - path: The route that should respond to GraphQL requests. Both `GET` and `POST` routes are registered.
     ///   - schema: The GraphQL schema that should be used to respond to requests.
@@ -17,18 +15,15 @@ public extension Router {
     ///   - config: GraphQL Handler configuration options. See type documentation for details.
     ///   - computeContext: A closure used to compute the GraphQL context from incoming requests. This must be provided.
     @discardableResult
-    func graphql<
-        GraphQLContext: Sendable,
-        WebSocketInit: Equatable & Codable & Sendable
-    >(
+    func graphql<GraphQLContext: Sendable>(
         _ path: RouterPath = "graphql",
         schema: GraphQLSchema,
         rootValue: any Sendable = (),
-        config: GraphQLConfig<WebSocketInit> = GraphQLConfig<EmptyWebsocketInit>(),
+        config: GraphQLConfig<EmptyWebSocketInit> = .init(),
         computeContext: @Sendable @escaping (Request, Context) async throws -> GraphQLContext
     ) -> Self {
         // https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md#request
-        let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit>(
+        let handler = GraphQLHandler<Context, GraphQLContext, EmptyWebSocketInit>(
             schema: schema,
             rootValue: rootValue,
             config: config,
@@ -42,7 +37,8 @@ public extension Router {
                 switch config.ide.type {
                 case .graphiql:
                     let url = request.uri.path
-                    let subscriptionUrl = config.subscriptionProtocols.contains(.websocket) ? url.replacingOccurrences(of: "http://", with: "ws://").replacingOccurrences(of: "https://", with: "wss://") : nil
+                    // Since we cannot know if websockets has been registered, assume we have a websocket at the same route.
+                    let subscriptionUrl = url.replacingOccurrences(of: "http://", with: "ws://").replacingOccurrences(of: "https://", with: "wss://")
                     return try await GraphiQLHandler.respond(
                         url: url,
                         subscriptionUrl: subscriptionUrl
@@ -54,9 +50,6 @@ public extension Router {
             }
 
             // Normal GET request handling
-            guard config.allowGet else {
-                throw HTTPError(.methodNotAllowed, message: "GET requests are disallowed")
-            }
             return try await handler.handleGet(request: request, context: context)
         }
 
@@ -83,14 +76,14 @@ public extension Router where Context: WebSocketRequestContext {
     ///   - config: GraphQL Handler configuration options. See type documentation for details. Note that all non-WebSocket values are ignored.
     ///   - computeContext: A closure used to compute the GraphQL context from incoming requests. This must be provided.
     @discardableResult
-    func graphqlSubscribe<
+    func graphqlWebSocket<
         GraphQLContext: Sendable,
         WebSocketInit: Equatable & Codable & Sendable
     >(
         _ path: RouterPath = "graphql",
         schema: GraphQLSchema,
         rootValue: any Sendable = (),
-        config: GraphQLConfig<WebSocketInit> = GraphQLConfig<EmptyWebsocketInit>(),
+        config: GraphQLConfig<WebSocketInit> = GraphQLConfig<EmptyWebSocketInit>(),
         computeContext: @Sendable @escaping (Request, Context) async throws -> GraphQLContext
     ) -> Self {
         let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit>(

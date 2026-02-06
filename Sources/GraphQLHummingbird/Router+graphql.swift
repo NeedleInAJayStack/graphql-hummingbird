@@ -8,8 +8,6 @@ public extension Router {
     /// The resulting routes adhere to the [GraphQL over HTTP spec](https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md).
     /// The configured IDE is available by making a `GET` request to the path with no query parameter.
     ///
-    /// WebSockets are not supported by the resulting route at this time.
-    ///
     /// - Parameters:
     ///   - path: The route that should respond to GraphQL requests. Both `GET` and `POST` routes are registered.
     ///   - schema: The GraphQL schema that should be used to respond to requests.
@@ -39,7 +37,7 @@ public extension Router {
                 switch config.ide.type {
                 case .graphiql:
                     let url = request.uri.path
-                    // Assume that we have a subscription websocket at the same route.
+                    // Since we cannot know if websockets has been registered, assume we have a websocket at the same route.
                     let subscriptionUrl = url.replacingOccurrences(of: "http://", with: "ws://").replacingOccurrences(of: "https://", with: "wss://")
                     return try await GraphiQLHandler.respond(
                         url: url,

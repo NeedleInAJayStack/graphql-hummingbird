@@ -297,7 +297,7 @@ struct HTTPTests {
                 #expect(response.status == .ok)
                 var responseBuffer = response.body
                 let result = responseBuffer.readString(length: responseBuffer.readableBytes)
-                #expect(result == GraphiQLHandler.html(url: "/graphql", subscriptionUrl: nil))
+                #expect(result == GraphiQLHandler.html(url: "/graphql", subscriptionUrl: "/graphql"))
             }
         }
     }

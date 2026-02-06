@@ -21,7 +21,7 @@ public struct GraphQLConfig<WebSocketInit: Equatable & Codable & Sendable>: Send
         allowGet: Bool = true,
         allowMissingAcceptHeader: Bool = false,
         ide: IDE = .graphiql,
-        subscriptionProtocols: Set<SubscriptionProtocol> = [],
+        subscriptionProtocols: Set<SubscriptionProtocol> = [.websocket],
         websocket: WebSocket = .init(
             // Including this strongly-typed argument is required to avoid compiler failures on Swift 6.2.3.
             onWebSocketInit: { (_: EmptyWebSocketInit) in }

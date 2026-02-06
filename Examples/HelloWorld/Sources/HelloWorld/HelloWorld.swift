@@ -45,21 +45,32 @@ struct HelloWorld {
         router.graphql(schema: schema, config: .init(allowMissingAcceptHeader: true)) { _, _ in
             GraphQLContext()
         }
-        router.graphqlSubscribe("graphqlSubscribe", schema: schema) { _, _ in
+        let webSocketRouter = Router(context: HummingbirdWebSocketContext.self)
+        webSocketRouter.graphqlWebSocket(schema: schema) { _, _ in
             GraphQLContext()
         }
         let app = Application(
             router: router,
-            server: .http1WebSocketUpgrade(webSocketRouter: router)
+            server: .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
         )
         try await app.runService()
     }
 
     struct GraphQLContext: @unchecked Sendable {}
 
-    struct HummingbirdContext: WebSocketRequestContext, RequestContext {
+    struct HummingbirdContext: RequestContext {
         var coreContext: Hummingbird.CoreRequestContextStorage
-        var webSocket: HummingbirdWebSocket.WebSocketHandlerReference<HummingbirdContext>
+        var logger: Logging.Logger
+
+        init(source: Hummingbird.ApplicationRequestContextSource) {
+            coreContext = .init(source: source)
+            logger = source.logger
+        }
+    }
+
+    struct HummingbirdWebSocketContext: WebSocketRequestContext, RequestContext {
+        var coreContext: Hummingbird.CoreRequestContextStorage
+        var webSocket: HummingbirdWebSocket.WebSocketHandlerReference<Self>
         var logger: Logging.Logger
 
         init(source: Hummingbird.ApplicationRequestContextSource) {

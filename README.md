@@ -37,6 +37,8 @@ Then add it to your target:
 
 ## Usage
 
+See [the HelloWorld project](https://github.com/GraphQLSwift/graphql-hummingbird/tree/main/Examples/HelloWorld) for a full working example.
+
 ### Basic Example
 
 ```swift
@@ -95,3 +97,33 @@ Response:
 ```
 
 See the `Router.graphql` function documentation for advanced configuration options.
+
+### WebSockets
+
+Subscription support via WebSockets can be enabled by calling the `graphqlWebSocket` function on a `Router` whose context conforms to `WebSocketRequestContext`, from the `HummingbirdWebSocket` package:
+
+```swift
+import GraphQL
+import GraphQLHummingbird
+import Hummingbird
+import HummingbirdWebSocket
+
+struct MyWebSocketContext: WebSocketRequestContext, RequestContext {
+    ...
+}
+
+let router = Router(context: MyContext.self)
+router.graphql(schema: schema) { _, _ in
+    GraphQLContext()
+}
+let webSocketRouter = Router(context: MyWebSocketContext.self)
+webSocketRouter.graphqlWebSocket(schema: schema) { _, _ in
+    GraphQLContext()
+}
+let app = Application(
+    router: router,
+    server: .http1WebSocketUpgrade(webSocketRouter: webSocketRouter)
+)
+```
+
+The example above follows Hummingbird best practices when it uses a separate router for HTTP and WebSocket requests. For more details, see the [Hummingbird WebSocket documentation](https://docs.hummingbird.codes/2.0/documentation/hummingbird/websocketserverupgrade#Overview).

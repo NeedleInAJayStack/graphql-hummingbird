@@ -2,7 +2,7 @@ import GraphQL
 import Hummingbird
 import HummingbirdWebSocket
 
-public extension Router {
+public extension RouterMethods {
     /// Registers graphql routes that respond using the provided schema.
     ///
     /// The resulting routes adhere to the [GraphQL over HTTP spec](https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md).
@@ -61,7 +61,7 @@ public extension Router {
     }
 }
 
-public extension Router where Context: WebSocketRequestContext {
+public extension RouterMethods where Context: WebSocketRequestContext {
     /// Registers a graphql websocket route that responds using the provided schema.
     ///
     /// WebSocket requests support the

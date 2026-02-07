@@ -96,7 +96,7 @@ Response:
 }
 ```
 
-See the `Router.graphql` function documentation for advanced configuration options.
+See the `graphql` function documentation for advanced configuration options.
 
 ### WebSockets
 

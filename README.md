@@ -1,6 +1,9 @@
 # GraphQLHummingbird
 
-***WARNING***: This package is in v0.x beta. It's API is still evolving and is subject to breaking changes in minor version bumps.
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FGraphQLSwift%2Fgraphql-hummingbird%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/GraphQLSwift/graphql-hummingbird)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FGraphQLSwift%2Fgraphql-hummingbird%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/GraphQLSwift/graphql-hummingbird)
+
+> ***WARNING***: This package is in v0.x beta. It's API is still evolving and is subject to breaking changes in minor version bumps.
 
 A Swift library for integrating [GraphQL](https://github.com/GraphQLSwift/GraphQL) with [Hummingbird](https://github.com/hummingbird-project/hummingbird), enabling you to easily expose GraphQL APIs in your Hummingbird applications.
 
@@ -42,6 +45,7 @@ import GraphQLHummingbird
 import Hummingbird
 
 // Define your GraphQL schema
+// To construct schemas, consider using `Graphiti` or `graphql-generator`
 let schema = try GraphQLSchema(
     query: GraphQLObjectType(
         name: "Query",
@@ -73,7 +77,7 @@ let app = Application(
 try await app.runService()
 ```
 
-Now just run the application! You can view the GraphiQL IDE at `/graphql`, or query directly using `GET` or `POST`:
+That's it! You can now view the GraphiQL IDE at http://localhost:8080/graphql, or query directly using `GET` or `POST`:
 
 ```bash
 curl -X POST http://localhost:8080/graphql \
@@ -90,7 +94,4 @@ Response:
 }
 ```
 
-See the `RouterMethods.graphql` function documentation for advanced configuration options.
-
-To build a type-safe GraphQL schema, consider [`graphql-generator`](https://github.com/GraphQLSwift/graphql-generator) or
-[`Graphiti`](https://github.com/GraphQLSwift/Graphiti)
+See the `Router.graphql` function documentation for advanced configuration options.

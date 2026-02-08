@@ -21,7 +21,7 @@ struct HTTPTests {
             try await client.execute(
                 uri: "/graphql",
                 method: .post,
-                headers: defaultHeaders,
+                headers: jsonGraphQLHeaders,
                 body: .init(data: JSONEncoder().encode(GraphQLRequest(query: "{ hello }")))
             ) { response in
                 #expect(response.status == .ok)
@@ -65,7 +65,7 @@ struct HTTPTests {
             try await client.execute(
                 uri: "/graphql",
                 method: .post,
-                headers: defaultHeaders,
+                headers: jsonGraphQLHeaders,
                 body: .init(data: JSONEncoder().encode(GraphQLRequest(
                     query: "query Greet($name: String) { greet(name: $name) }",
                     variables: ["name": "Alice"]
@@ -113,7 +113,7 @@ struct HTTPTests {
             try await client.execute(
                 uri: "/graphql",
                 method: .post,
-                headers: defaultHeaders,
+                headers: jsonGraphQLHeaders,
                 body: .init(data: JSONEncoder().encode(GraphQLRequest(query: "{ contextMessage }")))
             ) { response in
                 #expect(response.status == .ok)
@@ -145,6 +145,33 @@ struct HTTPTests {
             ) { response in
                 #expect(response.status == .ok)
                 #expect(response.headers[.contentType] == "application/json; charset=utf-8")
+
+                let result = try JSONDecoder().decode(GraphQLResult.self, from: response.body)
+                #expect(result.data?["hello"] == "World")
+                #expect(result.errors.isEmpty)
+            }
+        }
+    }
+
+    @Test func jsonContentTypeHeader() async throws {
+        let router = Router()
+        router.graphql(schema: helloWorldSchema) { _, _ in
+            EmptyContext()
+        }
+        let app = Application(router: router)
+
+        try await app.test(.router) { client in
+            try await client.execute(
+                uri: "/graphql",
+                method: .post,
+                headers: [
+                    .accept: MediaType.applicationJsonGraphQL.description,
+                    .contentType: MediaType.applicationJson.description,
+                ],
+                body: .init(data: JSONEncoder().encode(GraphQLRequest(query: "{ hello }")))
+            ) { response in
+                #expect(response.status == .ok)
+                #expect(response.headers[.contentType] == "application/graphql-response+json; charset=utf-8")
 
                 let result = try JSONDecoder().decode(GraphQLResult.self, from: response.body)
                 #expect(result.data?["hello"] == "World")
@@ -200,43 +227,6 @@ struct HTTPTests {
         }
     }
 
-    @Test func resolverError() async throws {
-        let schema = try GraphQLSchema(
-            query: GraphQLObjectType(
-                name: "Query",
-                fields: [
-                    "error": GraphQLField(
-                        type: GraphQLString,
-                        resolve: { _, _, _, _ in
-                            throw GraphQLError(message: "Something went wrong")
-                        }
-                    ),
-                ]
-            )
-        )
-        let router = Router()
-        router.graphql(schema: schema) { _, _ in
-            EmptyContext()
-        }
-        let app = Application(router: router)
-
-        try await app.test(.router) { client in
-            try await client.execute(
-                uri: "/graphql",
-                method: .post,
-                headers: defaultHeaders,
-                body: .init(data: JSONEncoder().encode(GraphQLRequest(query: "{ error }")))
-            ) { response in
-                #expect(response.status == .ok)
-                #expect(response.headers[.contentType] == "application/graphql-response+json; charset=utf-8")
-
-                let result = try JSONDecoder().decode(GraphQLResult.self, from: response.body)
-                #expect(!result.errors.isEmpty)
-                #expect(result.errors.first?.message == "Something went wrong")
-            }
-        }
-    }
-
     @Test func allowGetRequest() async throws {
         let router = Router()
         router.graphql(schema: helloWorldSchema) { _, _ in
@@ -248,7 +238,7 @@ struct HTTPTests {
             try await client.execute(
                 uri: "/graphql?query=%7Bhello%7D",
                 method: .get,
-                headers: defaultHeaders
+                headers: jsonGraphQLHeaders
             ) { response in
                 #expect(response.status == .ok)
 
@@ -275,7 +265,7 @@ struct HTTPTests {
             try await client.execute(
                 uri: "/graphql?query=%7Bhello%7D",
                 method: .get,
-                headers: defaultHeaders
+                headers: jsonGraphQLHeaders
             ) { response in
                 #expect(response.status == .methodNotAllowed)
             }
@@ -321,25 +311,4 @@ struct HTTPTests {
             }
         }
     }
-
-    let defaultHeaders: HTTPFields = [
-        .accept: MediaType.applicationJsonGraphQL.description,
-        .contentType: MediaType.applicationJsonGraphQL.description,
-    ]
-
-    let helloWorldSchema = try! GraphQLSchema(
-        query: GraphQLObjectType(
-            name: "Query",
-            fields: [
-                "hello": GraphQLField(
-                    type: GraphQLString,
-                    resolve: { _, _, _, _ in
-                        "World"
-                    }
-                ),
-            ]
-        )
-    )
-
-    struct EmptyContext: Sendable {}
 }

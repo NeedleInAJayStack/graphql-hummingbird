@@ -25,7 +25,7 @@ extension GraphQLHandler {
             throw HTTPError(.methodNotAllowed, message: "Mutations using GET are disallowed")
         }
         let graphqlContext = try await computeContext(request, context)
-        let result = try await execute(
+        let result = await execute(
             graphQLRequest: graphQLRequest,
             context: graphqlContext,
             additionalValidationRules: config.additionalValidationRules
@@ -43,15 +43,23 @@ extension GraphQLHandler {
         let graphQLRequest: GraphQLRequest
         switch mediaType {
         case .applicationJson, .applicationJsonGraphQL:
-            graphQLRequest = try await JSONDecoder().decode(GraphQLRequest.self, from: request, context: context)
+            do {
+                graphQLRequest = try await JSONDecoder().decode(GraphQLRequest.self, from: request, context: context)
+            } catch {
+                throw HTTPError(.badRequest, message: error.localizedDescription)
+            }
         case .applicationUrlEncoded:
-            graphQLRequest = try await URLEncodedFormDecoder().decode(GraphQLRequest.self, from: request, context: context)
+            do {
+                graphQLRequest = try await URLEncodedFormDecoder().decode(GraphQLRequest.self, from: request, context: context)
+            } catch {
+                throw HTTPError(.badRequest, message: error.localizedDescription)
+            }
         default:
             throw HTTPError(.unsupportedMediaType)
         }
 
         let graphqlContext = try await computeContext(request, context)
-        let result = try await execute(
+        let result = await execute(
             graphQLRequest: graphQLRequest,
             context: graphqlContext,
             additionalValidationRules: config.additionalValidationRules
@@ -63,7 +71,7 @@ extension GraphQLHandler {
         graphQLRequest: GraphQLRequest,
         context: GraphQLContext,
         additionalValidationRules: [@Sendable (ValidationContext) -> Visitor]
-    ) async throws -> GraphQLResult {
+    ) async -> GraphQLResult {
         // https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md#validation
         let validationRules = GraphQL.specifiedRules + additionalValidationRules
 
@@ -79,9 +87,11 @@ extension GraphQLHandler {
                 operationName: graphQLRequest.operationName,
                 validationRules: validationRules
             )
-        } catch {
+        } catch let error as GraphQLError {
             // This indicates a request parsing error
-            throw HTTPError(.badRequest, message: error.localizedDescription)
+            return GraphQLResult(data: nil, errors: [error])
+        } catch {
+            return GraphQLResult(data: nil, errors: [GraphQLError(message: error.localizedDescription)])
         }
         return result
     }

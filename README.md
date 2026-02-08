@@ -67,7 +67,7 @@ struct GraphQLContext: Sendable {}
 
 // Create router and register GraphQL
 let router = Router()
-router.graphql(schema: schema) { _, _ in
+router.graphql(schema: schema) { _ in
     return GraphQLContext()
 }
 
@@ -113,7 +113,7 @@ struct MyWebSocketContext: WebSocketRequestContext, RequestContext {
 }
 
 let router = Router(context: MyContext.self)
-router.graphql(schema: schema) { _, _ in
+router.graphql(schema: schema) { _ in
     GraphQLContext()
 }
 let webSocketRouter = Router(context: MyWebSocketContext.self)
@@ -143,7 +143,7 @@ router.graphql(
     config: .init(
         coders: .init(graphQLJSONEncoder: graphQLJSONEncoder)
     )
-) { _, _ in
+) { _ in
     GraphQLContext()
 }
 ```

@@ -311,4 +311,35 @@ struct HTTPTests {
             }
         }
     }
+
+    @Test func customEncoder() async throws {
+        let graphQLJSONEncoder = GraphQLJSONEncoder()
+        graphQLJSONEncoder.dateEncodingStrategy = .secondsSince1970
+        let router = Router()
+        router.graphql(
+            schema: helloWorldSchema,
+            config: .init(
+                coders: .init(graphQLJSONEncoder: graphQLJSONEncoder)
+            )
+        ) { _, _ in
+            EmptyContext()
+        }
+        let app = Application(router: router)
+
+        try await app.test(.router) { client in
+            try await client.execute(
+                uri: "/graphql",
+                method: .post,
+                headers: jsonGraphQLHeaders,
+                body: .init(data: defaultJSONEncoder.encode(GraphQLRequest(query: "{ hello }")))
+            ) { response in
+                #expect(response.status == .ok)
+                #expect(response.headers[.contentType] == "application/graphql-response+json; charset=utf-8")
+
+                let result = try defaultJSONDecoder.decode(GraphQLResult.self, from: response.body)
+                #expect(result.data?["hello"] == "World")
+                #expect(result.errors.isEmpty)
+            }
+        }
+    }
 }

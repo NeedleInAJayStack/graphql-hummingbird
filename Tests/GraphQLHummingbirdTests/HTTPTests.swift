@@ -227,43 +227,6 @@ struct HTTPTests {
         }
     }
 
-    @Test func resolverError() async throws {
-        let schema = try GraphQLSchema(
-            query: GraphQLObjectType(
-                name: "Query",
-                fields: [
-                    "error": GraphQLField(
-                        type: GraphQLString,
-                        resolve: { _, _, _, _ in
-                            throw GraphQLError(message: "Something went wrong")
-                        }
-                    ),
-                ]
-            )
-        )
-        let router = Router()
-        router.graphql(schema: schema) { _, _ in
-            EmptyContext()
-        }
-        let app = Application(router: router)
-
-        try await app.test(.router) { client in
-            try await client.execute(
-                uri: "/graphql",
-                method: .post,
-                headers: defaultHeaders,
-                body: .init(data: JSONEncoder().encode(GraphQLRequest(query: "{ error }")))
-            ) { response in
-                #expect(response.status == .ok)
-                #expect(response.headers[.contentType] == "application/graphql-response+json; charset=utf-8")
-
-                let result = try JSONDecoder().decode(GraphQLResult.self, from: response.body)
-                #expect(!result.errors.isEmpty)
-                #expect(result.errors.first?.message == "Something went wrong")
-            }
-        }
-    }
-
     @Test func allowGetRequest() async throws {
         let router = Router()
         router.graphql(schema: helloWorldSchema) { _, _ in

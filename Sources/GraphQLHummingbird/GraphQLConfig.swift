@@ -3,7 +3,10 @@ import GraphQL
 import Hummingbird
 
 /// Configuration options for GraphQLHummingbird
-public struct GraphQLConfig<WebSocketInit: Equatable & Codable & Sendable>: Sendable {
+public struct GraphQLConfig<
+    WebSocketInit: Equatable & Codable & Sendable,
+    WebSocketInitResult: Sendable
+>: Sendable {
     let allowGet: Bool
     let allowMissingAcceptHeader: Bool
     let coders: Coders
@@ -94,14 +97,14 @@ public struct GraphQLConfig<WebSocketInit: Equatable & Codable & Sendable>: Send
     }
 
     public struct WebSocket: Sendable {
-        let onWebSocketInit: @Sendable (WebSocketInit) async throws -> Void
+        let onWebSocketInit: @Sendable (WebSocketInit) async throws -> WebSocketInitResult
 
         /// GraphQL over WebSocket configuration
         /// - Parameter onWebSocketInit: A custom callback run during `connection_init` resolution that allows
         /// authorization using the `payload` field of the `connection_init` message.
         /// Throw from this closure to indicate that authorization has failed.
         public init(
-            onWebSocketInit: @Sendable @escaping (WebSocketInit) async throws -> Void = { (_: EmptyWebSocketInit) in }
+            onWebSocketInit: @Sendable @escaping (WebSocketInit) async throws -> WebSocketInitResult = { (_: EmptyWebSocketInit) in }
         ) {
             self.onWebSocketInit = onWebSocketInit
         }

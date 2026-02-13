@@ -14,18 +14,32 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
         subProtocol: WebSocketSubProtocol,
         logger: Logger
     ) async throws {
-        let messenger = WebSocketMessenger(inbound: inbound, outbound: outbound, logger: logger)
+        let messenger = WebSocketMessenger(outbound: outbound, logger: logger)
+
+        // TODO: Make maxSize configurable
+        let messageStream = inbound.messages(maxSize: 1024 * 1024).compactMap { message -> String? in
+            // TODO: Add binary support
+            guard case let .text(text) = message else {
+                return nil
+            }
+            logger.trace("GraphQL server received: \(message)")
+            return text
+        }
 
         switch subProtocol {
         case .graphqlTransportWs:
             // https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md
-            let server = GraphQLTransportWS.Server<WebSocketInit, AsyncThrowingStream<GraphQLResult, Error>>(
+            let server = GraphQLTransportWS.Server<WebSocketInit, WebSocketInitResult, AsyncThrowingStream<GraphQLResult, Error>>(
                 messenger: messenger,
-                onExecute: { graphQLRequest in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onInit: { initPayload in
+                    try await config.websocket.onWebSocketInit(initPayload, context.request, context.requestContext)
+                },
+                onExecute: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphql(
@@ -37,11 +51,12 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                         operationName: graphQLRequest.operationName
                     )
                 },
-                onSubscribe: { graphQLRequest in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onSubscribe: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphqlSubscribe(
@@ -54,19 +69,20 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                     ).get()
                 }
             )
-            server.onMessage { message in
-                logger.trace("GraphQL server received: \(String(message))")
-            }
-            server.auth(config.websocket.onWebSocketInit)
+            try await server.listen(to: messageStream)
         case .graphqlWs:
             // https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md
-            let server = GraphQLWS.Server<WebSocketInit, AsyncThrowingStream<GraphQLResult, Error>>(
+            let server = GraphQLWS.Server<WebSocketInit, WebSocketInitResult, AsyncThrowingStream<GraphQLResult, Error>>(
                 messenger: messenger,
-                onExecute: { graphQLRequest in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onInit: { initPayload in
+                    try await config.websocket.onWebSocketInit(initPayload, context.request, context.requestContext)
+                },
+                onExecute: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphql(
@@ -78,11 +94,12 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                         operationName: graphQLRequest.operationName
                     )
                 },
-                onSubscribe: { graphQLRequest in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onSubscribe: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphqlSubscribe(
@@ -95,12 +112,8 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                     ).get()
                 }
             )
-            server.onMessage { message in
-                logger.trace("GraphQL server received: \(String(message))")
-            }
-            server.auth(config.websocket.onWebSocketInit)
+            try await server.listen(to: messageStream)
         }
-        try await messenger.start()
     }
 
     func shouldUpgrade(request: Request) throws -> RouterShouldUpgrade {

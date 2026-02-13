@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/GraphQLSwift/GraphQLTransportWS.git",
       "state" : {
-        "revision" : "43a64cbec3177d05e834b9a70051ab858744b0d3",
-        "version" : "0.2.1"
+        "revision" : "6d62d9f980346f0644a5f4dc1593f2b0f1d07b44",
+        "version" : "1.0.0"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/GraphQLSwift/GraphQLWS.git",
       "state" : {
-        "revision" : "66b2570775436ce83f048cb8532a2baa9cbc7540",
-        "version" : "0.2.1"
+        "revision" : "5a3b62e478668199d22f52df7cc7d44b51394cb4",
+        "version" : "1.0.0"
       }
     },
     {

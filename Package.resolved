@@ -1,5 +1,5 @@
 {
-  "originHash" : "94ec184f7218ac0d0951ffe67092d4077c477ceee9ee85135752c9e150a39c73",
+  "originHash" : "f2124c90d97730f0c1ccfefce1998ffd49b45cc9e2a3815bb08e726361f2b6ce",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/GraphQLSwift/GraphQLTransportWS.git",
       "state" : {
-        "revision" : "43a64cbec3177d05e834b9a70051ab858744b0d3",
-        "version" : "0.2.1"
+        "revision" : "6d62d9f980346f0644a5f4dc1593f2b0f1d07b44",
+        "version" : "1.0.0"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/GraphQLSwift/GraphQLWS.git",
       "state" : {
-        "revision" : "66b2570775436ce83f048cb8532a2baa9cbc7540",
-        "version" : "0.2.1"
+        "revision" : "5a3b62e478668199d22f52df7cc7d44b51394cb4",
+        "version" : "1.0.0"
       }
     },
     {

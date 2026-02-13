@@ -19,11 +19,11 @@ public extension RouterMethods {
         _ path: RouterPath = "graphql",
         schema: GraphQLSchema,
         rootValue: any Sendable = (),
-        config: GraphQLConfig<EmptyWebSocketInit> = .init(),
-        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context>) async throws -> GraphQLContext
+        config: GraphQLConfig<Context, EmptyWebSocketInit, Void> = .init(),
+        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context, Void>) async throws -> GraphQLContext
     ) -> Self {
         // https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md#request
-        let handler = GraphQLHandler<Context, GraphQLContext, EmptyWebSocketInit>(
+        let handler = GraphQLHandler<Context, GraphQLContext, EmptyWebSocketInit, Void>(
             schema: schema,
             rootValue: rootValue,
             config: config,
@@ -78,15 +78,16 @@ public extension RouterMethods where Context: WebSocketRequestContext {
     @discardableResult
     func graphqlWebSocket<
         GraphQLContext: Sendable,
-        WebSocketInit: Equatable & Codable & Sendable
+        WebSocketInit: Equatable & Codable & Sendable,
+        WebSocketInitResult: Sendable
     >(
         _ path: RouterPath = "graphql",
         schema: GraphQLSchema,
         rootValue: any Sendable = (),
-        config: GraphQLConfig<WebSocketInit> = GraphQLConfig<EmptyWebSocketInit>(),
-        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context>) async throws -> GraphQLContext
+        config: GraphQLConfig<Context, WebSocketInit, WebSocketInitResult>,
+        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context, WebSocketInitResult>) async throws -> GraphQLContext
     ) -> Self {
-        let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit>(
+        let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit, WebSocketInitResult>(
             schema: schema,
             rootValue: rootValue,
             config: config,
@@ -106,5 +107,35 @@ public extension RouterMethods where Context: WebSocketRequestContext {
             )
         }
         return self
+    }
+
+    /// Registers a graphql websocket route that responds using the provided schema.
+    ///
+    /// WebSocket requests support the
+    /// [`graphql-transport-ws`](https://github.com/enisdenjo/graphql-ws/blob/master/PROTOCOL.md)
+    /// and [`graphql-ws`](https://github.com/apollographql/subscriptions-transport-ws/blob/master/PROTOCOL.md)
+    /// subprotocols.
+    ///
+    /// - Parameters:
+    ///   - path: The route that should respond to GraphQL requests. Both `GET` and `POST` routes are registered.
+    ///   - schema: The GraphQL schema that should be used to respond to requests.
+    ///   - rootValue: The `rootValue` GraphQL execution arg. This is the object passed to the root resolvers.
+    ///   - computeContext: A closure used to compute the GraphQL context from incoming requests. This must be provided.
+    @discardableResult
+    func graphqlWebSocket<GraphQLContext: Sendable>(
+        _ path: RouterPath = "graphql",
+        schema: GraphQLSchema,
+        rootValue: any Sendable = (),
+        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context, Void>) async throws -> GraphQLContext
+    ) -> Self {
+        // This is just an overload that allows not passing `config`, since we cannot use a default argument that
+        // uses `Context` without getting `error: generic parameter 'Self' could not be inferred` compilation errors
+        graphqlWebSocket(
+            path,
+            schema: schema,
+            rootValue: rootValue,
+            config: GraphQLConfig<Context, EmptyWebSocketInit, Void>(),
+            computeContext: computeContext
+        )
     }
 }

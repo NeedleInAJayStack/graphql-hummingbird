@@ -89,6 +89,102 @@ struct WebSocketTests {
         }
     }
 
+    @Test func subscriptionWithInitPayloadError() async throws {
+        let pubsub = SimplePubSub<String>()
+        let schema = try GraphQLSchema(
+            subscription: GraphQLObjectType(
+                name: "Subscription",
+                fields: [
+                    "hello": GraphQLField(
+                        type: GraphQLString,
+                        resolve: { source, _, _, _ in
+                            source as! String
+                        },
+                        subscribe: { _, _, _, _ in
+                            await pubsub.subscribe()
+                        }
+                    ),
+                ]
+            )
+        )
+
+        struct InitPayload: Equatable, Codable, Sendable {
+            let code: String
+        }
+        let acceptedCode = "abc"
+
+        let router = Router(context: TestWebSocketContext.self)
+        router.graphqlWebSocket(
+            schema: schema,
+            config: .init(
+                subscriptionProtocols: [.websocket],
+                websocket: .init(
+                    onWebSocketInit: { (initPayload: InitPayload, _, _) in
+                        initPayload.code == acceptedCode
+                    }
+                )
+            )
+        ) { inputs in
+            // If the codes don't match, this will fail on the subscribe/execute request
+            guard let codeIsValid = inputs.websocketInitResult, codeIsValid else {
+                throw GraphQLError(message: "Unauthorized")
+            }
+            return EmptyContext()
+        }
+        let app = Application(
+            router: Router(),
+            server: .http1WebSocketUpgrade(webSocketRouter: router),
+            configuration: .init(address: .hostname("127.0.0.1", port: 0))
+        )
+
+        _ = try await app.test(.live) { client in
+            try await client.ws(
+                "/graphql",
+                configuration: .init(additionalHeaders: [.secWebSocketProtocol: "graphql-transport-ws"])
+            ) { inbound, outbound, _ in
+                // Start the sequence
+                // Send incorrect code, expect an "Unauthorized" error on the subscribe call
+                try await outbound.write(.text(#"{"type": "connection_init", "payload": {"code": "def"}}"#))
+                for try await message in inbound.messages(maxSize: 1024 * 1024) {
+                    guard case let .text(message) = message else { return }
+                    #expect(!message.starts(with: "44"))
+                    let response = try #require(message.data(using: .utf8))
+                    if let _ = try? decoder.decode(GraphQLTransportWS.ConnectionAckResponse.self, from: response) {
+                        try await outbound.write(.text(#"""
+                        {
+                            "type": "subscribe",
+                            "payload": {
+                                "query": "subscription { hello }"
+                            },
+                            "id": "1"
+                        }
+                        """#))
+                        // Must wait for a few milliseconds for the subscription to get set up.
+                        try await Task.sleep(for: .milliseconds(10))
+                        // Force the server to emit an event
+                        await pubsub.emit(event: "World")
+                    } else if let _ = try? decoder.decode(GraphQLTransportWS.NextResponse.self, from: response) {
+                        Issue.record("Expected Error: \(message)")
+                        await pubsub.cancel()
+                        break
+                    } else if let _ = try? decoder.decode(GraphQLTransportWS.CompleteResponse.self, from: response) {
+                        Issue.record("Expected Error: \(message)")
+                        try await outbound.close(.goingAway, reason: nil)
+                        break
+                    } else if let errorResult = try? decoder.decode(GraphQLTransportWS.ErrorResponse.self, from: response) {
+                        #expect(errorResult.payload[0].message == "Unauthorized")
+                        await pubsub.cancel()
+                        try await outbound.close(.goingAway, reason: nil)
+                        break
+                    } else {
+                        Issue.record("Unrecognized message: \(message)")
+                        break
+                    }
+                }
+            }
+        }
+    }
+
     @Test func subscription_GraphQLWS() async throws {
         let pubsub = SimplePubSub<String>()
         let schema = try GraphQLSchema(

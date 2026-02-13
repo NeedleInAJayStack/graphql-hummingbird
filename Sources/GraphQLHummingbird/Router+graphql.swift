@@ -20,7 +20,7 @@ public extension RouterMethods {
         schema: GraphQLSchema,
         rootValue: any Sendable = (),
         config: GraphQLConfig<EmptyWebSocketInit, Void> = .init(),
-        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context>) async throws -> GraphQLContext
+        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context, Void>) async throws -> GraphQLContext
     ) -> Self {
         // https://github.com/graphql/graphql-over-http/blob/main/spec/GraphQLOverHTTP.md#request
         let handler = GraphQLHandler<Context, GraphQLContext, EmptyWebSocketInit, Void>(
@@ -85,7 +85,7 @@ public extension RouterMethods where Context: WebSocketRequestContext {
         schema: GraphQLSchema,
         rootValue: any Sendable = (),
         config: GraphQLConfig<WebSocketInit, WebSocketInitResult> = GraphQLConfig<EmptyWebSocketInit, Void>(),
-        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context>) async throws -> GraphQLContext
+        computeContext: @Sendable @escaping (GraphQLContextComputationInputs<Context, WebSocketInitResult>) async throws -> GraphQLContext
     ) -> Self {
         let handler = GraphQLHandler<Context, GraphQLContext, WebSocketInit, WebSocketInitResult>(
             schema: schema,

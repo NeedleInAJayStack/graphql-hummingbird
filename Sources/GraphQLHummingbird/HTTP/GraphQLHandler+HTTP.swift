@@ -24,10 +24,11 @@ extension GraphQLHandler {
         guard operationType != .mutation else {
             throw HTTPError(.methodNotAllowed, message: "Mutations using GET are disallowed")
         }
-        let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+        let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
             hummingbirdRequest: request,
             hummingbirdContext: context,
-            graphQLRequest: graphQLRequest
+            graphQLRequest: graphQLRequest,
+            websocketInitResult: nil
         )
         let graphQLContext = try await computeContext(graphQLContextComputationInputs)
         let result = await execute(
@@ -63,10 +64,11 @@ extension GraphQLHandler {
             throw HTTPError(.unsupportedMediaType)
         }
 
-        let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+        let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
             hummingbirdRequest: request,
             hummingbirdContext: context,
-            graphQLRequest: graphQLRequest
+            graphQLRequest: graphQLRequest,
+            websocketInitResult: nil
         )
         let graphQLContext = try await computeContext(graphQLContextComputationInputs)
         let result = await execute(

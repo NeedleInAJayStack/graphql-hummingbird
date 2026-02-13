@@ -34,11 +34,12 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                 onInit: { initPayload in
                     try await config.websocket.onWebSocketInit(initPayload)
                 },
-                onExecute: { graphQLRequest, _ in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onExecute: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphql(
@@ -50,11 +51,12 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                         operationName: graphQLRequest.operationName
                     )
                 },
-                onSubscribe: { graphQLRequest, _ in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onSubscribe: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphqlSubscribe(
@@ -75,11 +77,12 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                 onInit: { initPayload in
                     try await config.websocket.onWebSocketInit(initPayload)
                 },
-                onExecute: { graphQLRequest, _ in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onExecute: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphql(
@@ -91,11 +94,12 @@ extension GraphQLHandler where Context: WebSocketRequestContext {
                         operationName: graphQLRequest.operationName
                     )
                 },
-                onSubscribe: { graphQLRequest, _ in
-                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context>(
+                onSubscribe: { graphQLRequest, initResult in
+                    let graphQLContextComputationInputs = GraphQLContextComputationInputs<Context, WebSocketInitResult>(
                         hummingbirdRequest: context.request,
                         hummingbirdContext: context.requestContext,
-                        graphQLRequest: graphQLRequest
+                        graphQLRequest: graphQLRequest,
+                        websocketInitResult: initResult
                     )
                     let graphQLContext = try await computeContext(graphQLContextComputationInputs)
                     return try await graphqlSubscribe(
